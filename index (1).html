@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Générateur de Mise en Demeure — Diginative</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+:root {
+  --primary: #1a1a2e;
+  --accent: #2d6a9f;
+  --accent-bg: #e8f1f8;
+  --success: #166534;
+  --success-bg: #dcfce7;
+  --danger: #991b1b;
+  --danger-bg: #fee2e2;
+  --warning-bg: #fef9c3;
+  --warning: #854d0e;
+  --border: #e5e7eb;
+  --muted: #6b7280;
+  --bg: #f9fafb;
+  --card: #ffffff;
+  --text: #111827;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+header {
+  background: var(--primary);
+  color: white;
+  padding: 0.875rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+}
+header h1 { font-size: 1rem; font-weight: 600; }
+header small { font-size: 0.72rem; opacity: 0.5; display: block; margin-top: 1px; }
+
+.sig-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px; padding: 0.35rem 0.875rem;
+  cursor: pointer; font-size: 0.78rem; color: white;
+  transition: background 0.15s;
+}
+.sig-pill:hover { background: rgba(255,255,255,0.18); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+.dot.off { background: #f87171; }
+.sig-thumb { height: 22px; max-width: 60px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.8; }
+
+.layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 52px); }
+
+.sidebar {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 1.25rem 0.875rem;
+  position: sticky; top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+}
+.sidebar-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 0.5rem; margin-bottom: 0.5rem; }
+.co-btn {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 0.55rem 0.65rem;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: var(--radius-sm); text-align: left;
+  font-size: 0.87rem; color: var(--text); transition: background 0.12s;
+  font-family: inherit;
+}
+.co-btn:hover { background: var(--accent-bg); }
+.co-btn.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.co-init { width: 28px; height: 28px; border-radius: 6px; background: var(--accent-bg); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+
+.main { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.1rem; max-width: 820px; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 0.875rem; }
+.step { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; }
+.card-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+.hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.75rem; font-style: italic; }
+
+.fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.fg { display: flex; flex-direction: column; gap: 3px; }
+.fg.full { grid-column: 1/-1; }
+.fg label { font-size: 0.74rem; font-weight: 600; color: var(--muted); }
+.fg input, .fg textarea {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0.42rem 0.65rem; font-size: 0.87rem; font-family: inherit;
+  color: var(--text); background: white; transition: border 0.12s; outline: none;
+}
+.fg input:focus, .fg textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,106,159,0.1); }
+.fg textarea { resize: vertical; min-height: 60px; }
+
+.ebar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0.5rem 0.75rem; border-radius: var(--radius-sm);
+  font-size: 0.8rem; margin-bottom: 0.75rem;
+  border: 1px solid var(--border); color: var(--muted); background: var(--bg);
+}
+.ebar.loading { background: var(--warning-bg); color: var(--warning); border-color: #fde047; }
+.ebar.ok { background: var(--success-bg); color: var(--success); border-color: #86efac; }
+.ebar.err { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; }
+.spin { width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: sp 0.7s linear infinite; flex-shrink: 0; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+.uz {
+  border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+  padding: 1rem; text-align: center; cursor: pointer;
+  background: var(--bg); transition: all 0.12s; margin-bottom: 0.75rem;
+}
+.uz:hover, .uz.drag { border-color: var(--accent); background: var(--accent-bg); }
+.uz svg { color: var(--muted); }
+.uz p { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.uz strong { color: var(--accent); }
+
+.pa {
+  border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+  padding: 0.75rem; min-height: 65px; font-family: monospace; font-size: 0.8rem;
+  color: var(--text); background: var(--bg); outline: none; width: 100%;
+  white-space: pre-wrap; word-break: break-all; cursor: text; transition: border 0.12s;
+}
+.pa:focus { border-color: var(--accent); background: white; }
+.pa:empty::before { content: attr(data-ph); color: var(--muted); font-style: italic; pointer-events: none; }
+
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.5rem; }
+.tbl th { background: var(--bg); padding: 4px 8px; text-align: left; font-weight: 600; font-size: 0.72rem; border: 1px solid var(--border); color: var(--muted); }
+.tbl td { padding: 3px 8px; border: 1px solid var(--border); }
+.tbl tr:nth-child(even) td { background: var(--bg); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0.42rem 0.875rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: white;
+  cursor: pointer; font-size: 0.82rem; font-weight: 600;
+  color: var(--text); font-family: inherit; transition: all 0.12s;
+}
+.btn:hover { background: var(--bg); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+.btn.primary:hover { opacity: 0.88; }
+.btn.success { background: var(--success); border-color: var(--success); color: white; }
+.btn.success:hover { opacity: 0.88; }
+.btn.sm { padding: 0.3rem 0.6rem; font-size: 0.76rem; }
+.btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+
+.fi { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.78rem; margin-top: 3px; }
+.fi button { border: none; background: none; cursor: pointer; color: var(--danger); font-size: 0.9rem; padding: 0 3px; }
+
+.al { padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.82rem; margin-bottom: 4px; }
+.al.s { background: var(--success-bg); color: var(--success); border: 1px solid #86efac; }
+.al.e { background: var(--danger-bg); color: var(--danger); border: 1px solid #fca5a5; }
+.al.i { background: var(--accent-bg); color: var(--accent); border: 1px solid #93c5fd; }
+
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.sig-status { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+.sig-preview { max-height: 52px; max-width: 140px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: block; margin-bottom: 6px; }
+.sub-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+
+.no-co { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 400px; gap: 0.75rem; color: var(--muted); text-align: center; padding: 2rem; }
+
+/* Modal signature */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal { background: white; border-radius: 14px; padding: 1.75rem; width: 400px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal h2 { font-size: 1rem; font-weight: 700; margin-bottom: 0.35rem; }
+.modal p { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.1rem; }
+.modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.1rem; }
+.sig-big { max-height: 90px; max-width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); display: block; margin-top: 8px; }
+
+input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Modal Signature -->
+<div class="modal-bg" id="sigModal" style="display:none" onclick="if(event.target===this)closeSigModal()">
+  <div class="modal">
+    <h2>✍️ Ma signature</h2>
+    <p>Importée une fois, mémorisée définitivement dans ce navigateur. Appliquée automatiquement à toutes vos mises en demeure.</p>
+    <div class="uz" onclick="document.getElementById('sigModalIn').click()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+      <p>Cliquer pour importer <strong>PNG ou JPG</strong> (fond transparent idéal)</p>
+    </div>
+    <input type="file" id="sigModalIn" accept="image/*" onchange="handleSigUpload(event)">
+    <div id="sigModalPreview"></div>
+    <div class="modal-actions">
+      <button class="btn sm" style="color:var(--danger)" onclick="doDelSig()">Supprimer</button>
+      <button class="btn sm" onclick="closeSigModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>⚖️ Générateur de Mise en Demeure</h1>
+    <small>Diginative · Service Recouvrement</small>
+  </div>
+  <div class="sig-pill" onclick="openSigModal()">
+    <span class="dot off" id="sigDot"></span>
+    <span id="sigLabel">Signature — cliquer pour importer</span>
+    <span id="sigThumb"></span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-label">Société émettrice</div>
+    <div id="coList"></div>
+  </aside>
+  <main class="main" id="main">
+    <div class="no-co">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.25"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <p style="font-size:0.87rem">Sélectionnez une société émettrice dans le panneau de gauche.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+const COMPANIES = {
+  tastycloud: { name:"TASTYCLOUD", label:"Tasty Cloud", intro:"Madame, Monsieur,", relance:"Nous constatons avec regret qu'en dépit de nos trois courriers de relance, votre société n'a toujours pas réglé les factures listées ci-après.", iban:"CIC / IBAN : FR76 1005 7190 3000 0201 5110 171 / BIC : CMCIFRPP", footer:"SAS DIGINATIVE - 1025 AVENUE HENRI BECQUEREL, 34000 MONTPELLIER | www.tastycloud.fr | TVA intra FR55822651550 - SAS au capital de 103 144,77 € - 822 651 550 R.C.S. Montpellier" },
+  oxatis: { name:"NEW OXATIS", label:"Oxatis", intro:"Monsieur,", relance:"Nous constatons avec regret qu'en dépit de nos précédentes relances courrier et appels, votre société n'a toujours pas réglé les factures listées ci-après.", iban:"CIC / IBAN : FR76 1009 6185 5700 0989 6550 326 / BIC : CMCIFRPP", footer:"SAS NEW OXATIS - Parc Club du Millénaire - Bât 24 1025 Av Henri Becquerel 34000 MONTPELLIER | www.oxatis.com | TVA intra FR79831239744 - SAS au capital de 6 155 000 € - RCS MONTPELLIER 831 239 744" },
+  lundimatin: { name:"GROUPE LUNDI MATIN", label:"Lundi Matin", intro:"Madame, Monsieur,", relance:"Nous constatons avec regret qu'en dépit de nos trois courriers de relance, votre société n'a toujours pas réglé les factures listées ci-après.", iban:"IBAN : FR76 1005 7190 3000 0201 1580 147 BIC : CMCIFRPP", footer:"SAS LUNDI MATIN Parc Club du Millénaire, 1025 av. Henri Becquerel, Bâtiment 24, 34000 MONTPELLIER | www.lundimatin.fr | TVA intra FR91499092930 - SAS au capital de 60 000 € - RCS MONTPELLIER 499 092 930" },
+  izberg: { name:"IZBERG", label:"IZBERG", intro:"Madame, Monsieur,", relance:"Nous constatons avec regret qu'en dépit de nos trois courriers de relance, votre société n'a toujours pas réglé les factures listées ci-après.", iban:"CIC / IBAN : FR76 1005 7190 3000 0201 4770 186 / BIC : CMCIFRPP", footer:"SAS IZBERG - Parc Club du Millénaire, Bât 24, 1025 Rue Henri Becquerel 34000 MONTPELLIER | TVA intra FR94750230393 - SAS au capital de 93 425 € - RCS NANTERRE 750 230 393 | www.izberg-marketplace.com" },
+  effidence: { name:"EFFIDENCE ROBOTICS", label:"Effidence", intro:"Madame, Monsieur,", relance:"Nous constatons avec regret qu'en dépit de nos trois courriers de relance, votre société n'a toujours pas réglé les factures listées ci-après.", iban:"CIC / IBAN : FR76 1005 7190 3000 0201 7050 171 / BIC : CMCIFRPP", footer:"SAS EFFIDENCE ROBOTICS - Parc Club Millenaire, Batiment 24, 1025 avenue Henri Becquerel 34000 MONTPELLIER | TVA intra FR38939384319 - SAS au capital de 1 000 € - RCS MONTPELLIER 939 384 319 | www.effidence.com" },
+};
+
+const SIG_KEY = 'med_sig_v1';
+let sel = null, invRows = [], sumRows = [], sigUrl = null, invPDFs = [];
+
+// ─── SIGNATURE ────────────────────────────────────────────────────────────────
+function initSig() {
+  try { sigUrl = localStorage.getItem(SIG_KEY) || null; } catch(e) {}
+  updateSigHeader();
+}
+function saveSig(d) { try { localStorage.setItem(SIG_KEY, d); } catch(e) {} }
+function doDelSig() { sigUrl = null; try { localStorage.removeItem(SIG_KEY); } catch(e) {} updateSigHeader(); closeSigModal(); if(sel) render(); }
+function openSigModal() {
+  document.getElementById('sigModal').style.display = 'flex';
+  document.getElementById('sigModalPreview').innerHTML = sigUrl ? `<img src="${sigUrl}" class="sig-big">` : '';
+}
+function closeSigModal() { document.getElementById('sigModal').style.display = 'none'; }
+function handleSigUpload(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { sigUrl = ev.target.result; saveSig(sigUrl); updateSigHeader(); document.getElementById('sigModalPreview').innerHTML = `<img src="${sigUrl}" class="sig-big">`; if(sel) render(); };
+  r.readAsDataURL(f);
+}
+function updateSigHeader() {
+  document.getElementById('sigDot').className = 'dot' + (sigUrl ? '' : ' off');
+  document.getElementById('sigLabel').textContent = sigUrl ? 'Signature enregistrée ✓' : 'Signature — cliquer pour importer';
+  document.getElementById('sigThumb').innerHTML = sigUrl ? `<img src="${sigUrl}" class="sig-thumb">` : '';
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+function buildSidebar() {
+  const el = document.getElementById('coList'); el.innerHTML = '';
+  Object.entries(COMPANIES).forEach(([k, c]) => {
+    const b = document.createElement('button');
+    b.className = 'co-btn'; b.id = 'co-' + k;
+    b.innerHTML = `<span class="co-init">${c.label.substring(0,2).toUpperCase()}</span><span>${c.label}</span>`;
+    b.onclick = () => pick(k); el.appendChild(b);
+  });
+}
+function pick(k) {
+  sel = k; invRows = []; sumRows = []; invPDFs = [];
+  document.querySelectorAll('.co-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('co-' + k).classList.add('active');
+  render();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function today() { return new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' }); }
+
+function render() {
+  const sigHtml = sigUrl
+    ? `<div class="sig-status"><span class="dot"></span> Signature enregistrée</div>
+       <img src="${sigUrl}" class="sig-preview">
+       <div class="btn-row"><button class="btn sm" onclick="openSigModal()">Changer</button><button class="btn sm" style="color:var(--danger)" onclick="doDelSig()">Supprimer</button></div>`
+    : `<div class="sig-status"><span class="dot off"></span> Aucune signature</div>
+       <div class="uz" onclick="openSigModal()">
+         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+         <p>Importer ma <strong>signature</strong></p>
+       </div>`;
+
+  document.getElementById('main').innerHTML = `
+  <div class="card">
+    <div class="card-head"><span class="step">1</span><span class="card-title">Destinataire — extraction automatique</span></div>
+    <p class="hint">Importez une facture PDF : le nom et l'adresse du client sont extraits automatiquement, sans IA ni coût.</p>
+    <div id="ebar" class="ebar">ℹ️ Importez une facture PDF pour remplir automatiquement les champs</div>
+    <div class="uz" onclick="document.getElementById('autoIn').click()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+      <p>Importer une <strong>facture PDF client</strong></p>
+    </div>
+    <input type="file" id="autoIn" accept=".pdf" onchange="extractPDF(event)">
+    <div class="fgrid">
+      <div class="fg full"><label>Nom de la société cliente</label><input type="text" id="cName" placeholder="ex : ACME SAS"></div>
+      <div class="fg"><label>Contact</label><input type="text" id="cContact" placeholder="ex : M. Dupont"></div>
+      <div class="fg"><label>Date du courrier</label><input type="text" id="cDate" value="${today()}"></div>
+      <div class="fg full"><label>Adresse complète</label><textarea id="cAddr" rows="3" placeholder="Numéro, rue&#10;Code postal Ville"></textarea></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="step">2</span><span class="card-title">Tableau des factures — coller depuis Sheets</span></div>
+    <p class="hint">Copiez vos lignes (Ctrl+C) puis collez ici (Ctrl+V). Colonnes attendues : Date · Référence · Montant TTC · Jours retard · Intérêts · Indemnité</p>
+    <div class="pa" id="invP" contenteditable="true" data-ph="Collez vos données ici (Ctrl+V)…"></div>
+    <div id="invPrev"></div>
+    <div class="btn-row">
+      <button class="btn sm" onclick="parseInv()">↻ Aperçu</button>
+      <button class="btn sm" onclick="clearInv()">✕ Vider</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="step">3</span><span class="card-title">Tableau des totaux — coller depuis Sheets</span></div>
+    <p class="hint">Copiez-collez les lignes de totaux (Total dû, Total intérêt, Total indemnité…)</p>
+    <div class="pa" id="sumP" contenteditable="true" data-ph="Collez vos totaux ici (Ctrl+V)…"></div>
+    <div id="sumPrev"></div>
+    <div class="btn-row"><button class="btn sm" onclick="parseSum()">↻ Aperçu</button></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="step">4</span><span class="card-title">Signature &amp; Factures PDF à joindre</span></div>
+    <div class="g2">
+      <div><div class="sub-label">Signature</div>${sigHtml}</div>
+      <div>
+        <div class="sub-label">Factures à joindre</div>
+        <div class="uz" onclick="document.getElementById('pdfIn').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="dropP(event)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          <p>Cliquer ou <strong>glisser-déposer</strong> des PDFs</p>
+        </div>
+        <input type="file" id="pdfIn" accept=".pdf" multiple onchange="loadP(event)">
+        <div id="pdfList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="step">5</span><span class="card-title">Génération</span></div>
+    <div id="genA"></div>
+    <div class="btn-row" style="margin-top:0.5rem">
+      <button class="btn primary" onclick="genLetter()">📄 Mise en demeure seule</button>
+      <button class="btn success" onclick="genFull()">📦 Package complet signé + factures</button>
+    </div>
+    <p style="font-size:0.74rem;color:var(--muted);margin-top:0.6rem">Le package fusionne la mise en demeure signée avec toutes les factures en un seul PDF.</p>
+  </div>`;
+
+  document.getElementById('invP').addEventListener('paste', () => setTimeout(parseInv, 100));
+  document.getElementById('sumP').addEventListener('paste', () => setTimeout(parseSum, 100));
+}
+
+// ─── EXTRACTION PDF PAR RÈGLES (100% local, gratuit) ─────────────────────────
+// Structure Lundi Matin : après "Date : JJ/MM/AAAA", le bloc client est sur
+// les lignes suivantes jusqu'à "Page X/X" ou "Désignation"
+// Ligne 1 = nom société, ligne 2 = adresse, ligne 3 = CP + Ville
+
+function setBar(type, msg) {
+  const el = document.getElementById('ebar'); if (!el) return;
+  const spin = type === 'loading' ? '<span class="spin"></span>' : '';
+  el.className = 'ebar' + (type === 'idle' ? '' : ' ' + type);
+  el.innerHTML = spin + ' ' + msg;
+}
+
+async function extractPDF(event) {
+  const file = event.target.files[0]; if (!file) return;
+  setBar('loading', 'Lecture du PDF en cours…');
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+
+    // Extraire les items de la page 1 avec leurs positions Y pour respecter l'ordre visuel
+    const pg = await pdf.getPage(1);
+    const ct = await pg.getTextContent();
+
+    // Regrouper par ligne (items proches en Y = même ligne)
+    const lines = [];
+    let curY = null, curLine = [];
+    const sorted = ct.items.slice().sort((a, b) => b.transform[5] - a.transform[5]); // tri Y décroissant (haut→bas)
+    for (const item of sorted) {
+      const y = Math.round(item.transform[5]);
+      if (curY === null) curY = y;
+      if (Math.abs(y - curY) > 4) {
+        if (curLine.length) lines.push(curLine.map(i => i.str).join(' ').trim());
+        curLine = [item]; curY = y;
+      } else {
+        curLine.push(item);
+      }
+    }
+    if (curLine.length) lines.push(curLine.map(i => i.str).join(' ').trim());
+
+    // Chercher le pattern : après la date, extraire les lignes client
+    // Marqueurs de début : ligne contenant "Date :" ou "Date:"
+    // Marqueurs de fin : "Page", "Désignation", "Designation", "Référence"
+    const STOP = /^(Page\s|Désignation|Designation|Référence|Reference|TVA|Montant|Siege|Siège|Service|Société|FACTURE)/i;
+    const DATE_MARKER = /Date\s*:/i;
+    const EMITTER_NAMES = /lundi\s*matin|tastycloud|oxatis|izberg|effidence|diginative/i;
+
+    let afterDate = false;
+    const clientLines = [];
+
+    for (const line of lines) {
+      if (!line) continue;
+      if (DATE_MARKER.test(line)) { afterDate = true; continue; }
+      if (!afterDate) continue;
+      if (STOP.test(line)) break;
+      // Ignorer les lignes qui sont l'émetteur (nos propres sociétés)
+      if (EMITTER_NAMES.test(line)) continue;
+      // Ignorer les lignes trop courtes ou qui ressemblent à des codes-barres
+      if (line.length < 3) continue;
+      clientLines.push(line);
+      if (clientLines.length >= 4) break;
+    }
+
+    if (!clientLines.length) throw new Error('Bloc client introuvable. Vérifiez que c\'est bien une facture Lundi Matin.');
+
+    // Remplir les champs
+    document.getElementById('cName').value = clientLines[0] || '';
+    const addrParts = clientLines.slice(1).filter(Boolean);
+    document.getElementById('cAddr').value = addrParts.join('\n');
+
+    setBar('ok', '✓ Client extrait : ' + clientLines[0] + ' — vérifiez et corrigez si besoin');
+  } catch(e) { setBar('err', '✗ ' + e.message); }
+}
+
+// ─── PASTE ────────────────────────────────────────────────────────────────────
+function cleanCell(s) {
+  s = s.trim();
+  s = s.replace(/([0-9])\s*[\/\\]\s*([0-9])/g, '$1 $2');
+  s = s.replace(/  +/g, ' ');
+  return s;
+}
+function parseTSV(t) { return t.trim().split('\n').map(l => l.split('\t').map(c => cleanCell(c))); }
+function parseInv() {
+  const el = document.getElementById('invP'); if (!el) return;
+  const raw = (el.innerText || el.textContent); if (!raw.trim()) return;
+  const rows = parseTSV(raw).filter(r => r.some(c => c)); invRows = rows;
+  const hs = ['Date','Référence','Montant TTC','Jours retard','Intérêts','Indemnité'];
+  let h = '<table class="tbl"><thead><tr>' + hs.map(x => `<th>${x}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(r => { h += '<tr>' + Array.from({length:6}, (_,i) => `<td>${r[i]||''}</td>`).join('') + '</tr>'; });
+  document.getElementById('invPrev').innerHTML = h + '</tbody></table><div class="al s" style="margin-top:4px">✓ ' + rows.length + ' ligne(s) importée(s)</div>';
+}
+function parseSum() {
+  const el = document.getElementById('sumP'); if (!el) return;
+  const raw = (el.innerText || el.textContent); if (!raw.trim()) return;
+  const rows = parseTSV(raw).filter(r => r.some(c => c)); sumRows = rows;
+  let h = '<table class="tbl"><thead><tr><th>Libellé</th><th>Montant</th></tr></thead><tbody>';
+  rows.forEach(r => { h += `<tr><td>${r[0]||''}</td><td>${r[1]||''}</td></tr>`; });
+  document.getElementById('sumPrev').innerHTML = h + '</tbody></table><div class="al s" style="margin-top:4px">✓ ' + rows.length + ' ligne(s)</div>';
+}
+function clearInv() { const el = document.getElementById('invP'); if(el) el.innerText=''; const p = document.getElementById('invPrev'); if(p) p.innerHTML=''; invRows=[]; }
+
+// ─── PDF FACTURES ─────────────────────────────────────────────────────────────
+function dropP(e) { e.preventDefault(); e.currentTarget.classList.remove('drag'); addPDFs(Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf')); }
+function loadP(e) { addPDFs(Array.from(e.target.files)); }
+function addPDFs(files) { files.forEach(f => { if (!invPDFs.find(p => p.name === f.name)) invPDFs.push(f); }); renderPList(); }
+function remPDF(n) { invPDFs = invPDFs.filter(f => f.name !== n); renderPList(); }
+function renderPList() {
+  const el = document.getElementById('pdfList'); if (!el) return;
+  el.innerHTML = invPDFs.map(f => `<div class="fi"><span>📄 ${f.name}</span><button onclick="remPDF('${f.name.replace(/'/g,"\\'")}')">✕</button></div>`).join('');
+}
+
+// ─── ALERTS ───────────────────────────────────────────────────────────────────
+function addAl(t, m) { const el = document.getElementById('genA'); if(el) el.insertAdjacentHTML('beforeend', `<div class="al ${t}">${m}</div>`); }
+function clearAl() { const el = document.getElementById('genA'); if(el) el.innerHTML = ''; }
+function valid(sig) {
+  clearAl(); let ok = true;
+  if (!document.getElementById('cName')?.value.trim()) { addAl('e', '⚠ Renseignez le nom de la société cliente.'); ok = false; }
+  if (!invRows.length) { addAl('e', '⚠ Collez le tableau des factures (étape 2).'); ok = false; }
+  if (!sumRows.length) { addAl('e', '⚠ Collez le tableau des totaux (étape 3).'); ok = false; }
+  if (sig && !sigUrl) { addAl('e', '⚠ Aucune signature — importez-la via le bouton en haut de page.'); ok = false; }
+  return ok;
+}
+
+// ─── GÉNÉRATION PDF ───────────────────────────────────────────────────────────
+function buildPDF(withSig) {
+  const { jsPDF } = window.jspdf;
+  const c = COMPANIES[sel];
+  const cName = document.getElementById('cName').value.trim();
+  const cCont = document.getElementById('cContact').value.trim();
+  const cAddr = document.getElementById('cAddr').value.trim();
+  const cDate = document.getElementById('cDate').value.trim();
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W=210, H=297, ml=15, mr=15, mt=18; let y=mt; const bw=W-ml-mr;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(0,0,0);
+  doc.text(c.name, ml, y+7); y+=18;
+
+  // Bloc destinataire — positionné à droite, largeur max 75mm pour éviter tout débordement
+  const rx=120, rxW=75;
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  const cNameWrapped = doc.splitTextToSize(cName||'Nom société', rxW);
+  doc.text(cNameWrapped, rx, mt+3);
+  doc.setFont('helvetica','normal');
+  let ry = mt + 3 + cNameWrapped.length * 5;
+  if (cCont) {
+    const cContW = doc.splitTextToSize(cCont, rxW);
+    doc.text(cContW, rx, ry); ry += cContW.length * 5;
+  }
+  (cAddr||'Adresse').split('\n').forEach(l => {
+    if (l.trim()) { const lw = doc.splitTextToSize(l.trim(), rxW); doc.text(lw, rx, ry); ry += lw.length * 5; }
+  });
+
+  y = Math.max(mt+36, ry+4);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('Lettre Recommandée', ml, y);
+  doc.setDrawColor(0); doc.line(ml, y+1, ml+doc.getTextWidth('Lettre Recommandée'), y+1);
+  y+=5; doc.text('A Montpellier, le '+cDate, ml, y); y+=11;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(c.intro, ml, y); y+=7;
+  const rl = doc.splitTextToSize(c.relance, bw);
+  doc.text(rl, ml, y); y+=rl.length*5+5;
+
+  doc.autoTable({
+    startY: y,
+    head: [['Date','Référence','Montant TTC','Jours de\nRetard','Intérêts','Indemnité']],
+    body: invRows.map(r => Array.from({length:6}, (_,i) => r[i]||'')),
+    theme:'grid', tableWidth:180,
+    styles: { fontSize:8.5, cellPadding:2.5, font:'helvetica' },
+    headStyles: { fillColor:[245,245,245], textColor:[0,0,0], fontStyle:'bold', halign:'center' },
+    columnStyles: { 0:{cellWidth:28}, 1:{cellWidth:42}, 2:{cellWidth:30,halign:'right'}, 3:{cellWidth:20,halign:'center'}, 4:{cellWidth:28,halign:'right'}, 5:{cellWidth:32,halign:'right'} },
+    margin: { left:ml, right:mr },
+  });
+  y = doc.lastAutoTable.finalY+7;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  const mid = "En conséquence, nous vous mettons en demeure de régler dans un délai de cinq (5) jours, à compter de la réception du présent courrier, le montant intégral de notre créance, ainsi que les intérêts légaux de retard.";
+  const midL = doc.splitTextToSize(mid, bw);
+  doc.text(midL, ml, y); y+=midL.length*5+5;
+
+  doc.autoTable({
+    startY: y,
+    body: sumRows.map(r => [r[0]||'', r[1]||'']),
+    theme:'grid',
+    styles: { fontSize:9, cellPadding:3, font:'helvetica' },
+    columnStyles: { 0:{fontStyle:'bold', cellWidth:110}, 1:{cellWidth:70, halign:'right'} },
+    margin: { left:ml, right:mr },
+  });
+  y = doc.lastAutoTable.finalY+9;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('Etablissement : '+c.iban, ml, y); y+=6;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  ["Aussi, nous sommes contraints de bloquer votre compte jusqu'au paiement total de votre dette.",
+   "Faute de vous exécuter dans le délai requis, nous nous verrons contraints de procéder au recouvrement de notre créance par voie judiciaire.",
+   "Si vous nous avez adressé votre règlement entre-temps, nous vous demandons de ne pas tenir compte de la présente."
+  ].forEach(p => { const ls=doc.splitTextToSize(p,bw); doc.text(ls,ml,y); y+=ls.length*5+2; });
+  y+=5;
+
+  const civ = c.intro==='Monsieur,' ? 'Monsieur,' : 'Madame, Monsieur,';
+  doc.text("Nous vous prions d'agréer, "+civ+" nos salutations distinguées.", ml, y); y+=9;
+  doc.text('Le service recouvrement', ml, y); y+=5;
+  doc.setFont('helvetica','bold'); doc.text(c.name, ml, y); y+=10;
+
+  if (withSig && sigUrl) { try { doc.addImage(sigUrl,'PNG',ml,y,52,20); y+=25; } catch(e) {} }
+
+  const fy=H-16;
+  doc.setDrawColor(210,210,210); doc.line(ml, fy-4, W-mr, fy-4);
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.8); doc.setTextColor(130,130,130);
+  doc.text(doc.splitTextToSize(c.footer, bw), ml, fy);
+  return doc;
+}
+
+function genLetter() {
+  if (!valid(false)) return; clearAl();
+  try {
+    const n = (document.getElementById('cName').value.trim()||'client').replace(/\s+/g,'_');
+    buildPDF(false).save('Mise_en_demeure_'+COMPANIES[sel].label+'_'+n+'.pdf');
+    addAl('s', '✓ PDF téléchargé avec succès.');
+  } catch(e) { addAl('e', '✗ Erreur : '+e.message); }
+}
+
+async function genFull() {
+  if (!valid(true)) return; clearAl();
+  addAl('i', 'Fusion en cours…');
+  try {
+    const lBytes = buildPDF(true).output('arraybuffer');
+    const { PDFDocument } = window.PDFLib;
+    const merged = await PDFDocument.create();
+    const ld = await PDFDocument.load(lBytes);
+    (await merged.copyPages(ld, ld.getPageIndices())).forEach(p => merged.addPage(p));
+    let skip = 0;
+    for (const f of invPDFs) {
+      try { const id=await PDFDocument.load(await f.arrayBuffer()); (await merged.copyPages(id,id.getPageIndices())).forEach(p=>merged.addPage(p)); }
+      catch(e) { skip++; }
+    }
+    const blob = new Blob([await merged.save()], { type:'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const n = (document.getElementById('cName').value.trim()||'client').replace(/\s+/g,'_');
+    a.href=url; a.download='MED_complete_'+COMPANIES[sel].label+'_'+n+'.pdf';
+    a.click(); URL.revokeObjectURL(url);
+    clearAl();
+    addAl('s', '✓ Package téléchargé : mise en demeure signée + '+(invPDFs.length-skip)+' facture(s).'+(skip?' '+skip+' ignoré(s).':''));
+  } catch(e) { clearAl(); addAl('e', '✗ Erreur fusion : '+e.message); }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+initSig();
+buildSidebar();
+</script>
+</body>
+</html>
